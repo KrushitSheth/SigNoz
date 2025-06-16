@@ -295,6 +295,27 @@ presets:
       key: app.kubernetes.io/name
       from: pod
 
+otelCollector:
+  config:
+    processors:
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          labels:
+            - tag_name: service.name
+              key: "service.name"
+
+      batch:
+        timeout: 5s
+        send_batch_size: 1024
+
+    service:
+      pipelines:
+        logs:
+          receivers: [otlp]
+          processors: [k8sattributes, batch]
+          exporters: [signoz]
+
 
 Step 2:
 
