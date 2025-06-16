@@ -12,10 +12,12 @@
 ->
 My setup is done on MacOS with minikube, docker, helm, homebrew tooling used
 
+
 Step 1: 
 
 Firstly created small kubernetes self-hosted cluster using minikube:
 minikube start --nodes=6 -p multinode-demo
+
 
 Step 2: 
    
@@ -30,6 +32,7 @@ global:
   storageClass: standard
 clickhouse:
   installCustomStorageClass: false         # here given false as self-hosted had limited permissions and used standard storage class instead
+
 
 Step 3: 
 
@@ -242,6 +245,7 @@ status:
   updateRevision: signoz-zookeeper-5f8c444475
   updatedReplicas: 1
 
+
 Step 4: 
 
 all Pods run successfully
@@ -291,6 +295,7 @@ presets:
       key: app.kubernetes.io/name
       from: pod
 
+
 Step 2:
 
 Deploy the signoz k8s-infra helm chart with override-values.yaml :
@@ -320,9 +325,9 @@ Handling connection for 8080
 
 b. {"status":"ok"}% 
 
+
 Step 4:
 
-Check the logs coming in as expected related via service name:
+Check the logs coming in as expected related via service name On SigNoz Cloud India Region.
 
-See attachment_1.
 
