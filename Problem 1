@@ -1,0 +1,265 @@
+1. 1. **Main SigNoz Chart** (`signoz`)
+  - This is like the control center of SigNoz
+  - It installs all the main components that make SigNoz work
+  - These components include things like:
+    - Query service (queries users data)
+    - Frontend (the dashboard users see)
+    - Collector (processes users data)
+    - Alertmanager (sends alerts)
+    - Clickhouse (stores users data)
+    - Other essential parts
+
+->
+Step 1: 
+
+Firstly created small kubernetes self-hosted cluster using minikube:
+minikube start --nodes=6 -p multinode-demo
+
+Step 2: 
+   
+   helm install signoz signoz/signoz \       
+   --namespace default --set clickhouse.securityContext.runAsUser=0 --set clickhouse.securityContext.runAsGroup=0 --set clickhouse.securityContext.fsGroup=0  \   
+   --wait \
+   --timeout 1h \
+   -f values.yaml
+
+values.yaml:
+global:
+  storageClass: standard
+clickhouse:
+  installCustomStorageClass: false         # here given false as self-hosted had limited permissions and used standard storage class instead
+
+Step 3: 
+
+Edited signoz-zookeeper statefulset and changed security context to use root permission.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    meta.helm.sh/release-name: signoz
+    meta.helm.sh/release-namespace: default
+  creationTimestamp: "2025-06-16T16:02:34Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/component: zookeeper
+    app.kubernetes.io/instance: signoz
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: zookeeper
+    helm.sh/chart: zookeeper-11.4.2
+    role: zookeeper
+  name: signoz-zookeeper
+  namespace: default
+  resourceVersion: "1609"
+  uid: 15363f5c-789d-448c-899a-e4eaf8d08b0e
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: zookeeper
+      app.kubernetes.io/instance: signoz
+      app.kubernetes.io/name: zookeeper
+  serviceName: signoz-zookeeper-headless
+  template:
+    metadata:
+      annotations:
+        signoz.io/path: /metrics
+        signoz.io/port: "9141"
+        signoz.io/scrape: "true"
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component: zookeeper
+        app.kubernetes.io/instance: signoz
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: zookeeper
+        helm.sh/chart: zookeeper-11.4.2
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: zookeeper
+                  app.kubernetes.io/instance: signoz
+                  app.kubernetes.io/name: zookeeper
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - command:
+        - /scripts/setup.sh
+        env:
+        - name: BITNAMI_DEBUG
+          value: "false"
+        - name: ZOO_DATA_LOG_DIR
+        - name: ZOO_PORT_NUMBER
+          value: "2181"
+        - name: ZOO_TICK_TIME
+          value: "2000"
+        - name: ZOO_INIT_LIMIT
+          value: "10"
+        - name: ZOO_SYNC_LIMIT
+          value: "5"
+        - name: ZOO_PRE_ALLOC_SIZE
+          value: "65536"
+        - name: ZOO_SNAPCOUNT
+          value: "100000"
+        - name: ZOO_MAX_CLIENT_CNXNS
+          value: "60"
+        - name: ZOO_4LW_COMMANDS_WHITELIST
+          value: srvr, mntr, ruok
+        - name: ZOO_LISTEN_ALLIPS_ENABLED
+          value: "no"
+        - name: ZOO_AUTOPURGE_INTERVAL
+          value: "1"
+        - name: ZOO_AUTOPURGE_RETAIN_COUNT
+          value: "3"
+        - name: ZOO_MAX_SESSION_TIMEOUT
+          value: "40000"
+        - name: ZOO_SERVERS
+          value: signoz-zookeeper-0.signoz-zookeeper-headless.default.svc.cluster.local:2888:3888::1
+        - name: ZOO_ENABLE_AUTH
+          value: "no"
+        - name: ZOO_ENABLE_QUORUM_AUTH
+          value: "no"
+        - name: ZOO_HEAP_SIZE
+          value: "1024"
+        - name: ZOO_LOG_LEVEL
+          value: INFO
+        - name: ALLOW_ANONYMOUS_LOGIN
+          value: "yes"
+        - name: ZOO_ENABLE_PROMETHEUS_METRICS
+          value: "yes"
+        - name: ZOO_PROMETHEUS_METRICS_PORT_NUMBER
+          value: "9141"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: bitnami/zookeeper:3.7.1
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - curl -s -m 2 http://localhost:8080/commands/ruok | grep ruok
+          failureThreshold: 6
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: zookeeper
+        ports:
+        - containerPort: 2181
+          name: client
+          protocol: TCP
+        - containerPort: 2888
+          name: follower
+          protocol: TCP
+        - containerPort: 3888
+          name: election
+          protocol: TCP
+        - containerPort: 9141
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep
+              null
+          failureThreshold: 6
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: true                        # <------
+          runAsNonRoot: false                                   # <------ changed here
+          runAsUser: 0                                          # <------
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /scripts/setup.sh
+          name: scripts
+          subPath: setup.sh
+        - mountPath: /bitnami/zookeeper
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 0                                              # <------ changed here
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 493
+          name: signoz-zookeeper-scripts
+        name: scripts
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      creationTimestamp: null
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 8Gi
+      storageClassName: standard
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: signoz-zookeeper-5f8c444475
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: signoz-zookeeper-5f8c444475
+  updatedReplicas: 1
+
+Step 4: 
+
+all Pods run successfully
+kubectl get pods
+NAME                                          READY   STATUS      RESTARTS   AGE
+chi-signoz-clickhouse-cluster-0-0-0           1/1     Running     0          9m15s
+signoz-0                                      1/1     Running     0          9m41s
+signoz-clickhouse-operator-5b6db6bf84-vxz2h   2/2     Running     0          9m41s
+signoz-otel-collector-86d6999975-z89dp        1/1     Running     0          9m41s
+signoz-schema-migrator-async-init-b9shb       0/1     Completed   0          9m41s
+signoz-schema-migrator-sync-init-gts42        0/1     Completed   4          9m41s
+signoz-zookeeper-0                            1/1     Running     0          6m31s
+
+
+
+2. **Infrastructure Monitoring Chart** (`k8s-infra`)
+  - This is like a set of watchers for your Kubernetes cluster
+  - It installs agents that collect information about what's happening
+  - These agents gather things like:
+    - Logs (messages from your applications)
+    - Metrics (numbers about performance)
+
+
