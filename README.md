@@ -7,3 +7,7 @@ Logs successfully seen as per service name.
 
 
 ![Screenshot 2025-06-17 at 12 14 55 AM](https://github.com/user-attachments/assets/5693cdb5-8557-476b-94fa-9495a7def996)
+All pods working successfully.
+
+
+
