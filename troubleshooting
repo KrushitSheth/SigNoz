@@ -1,0 +1,36 @@
+1. Got below error in zookeeper statefulset when checked the pod logs:
+
+kubectl logs signoz-zookeeper-0 --previous
+mkdir: cannot create directory '/bitnami/zookeeper/data': Permission denied
+
+Solution:
+As it is test environment I gave root permissions to zookeeper pod so it can create a directory and file easily on the host volume i.e worker node.
+If it had been production we should give limited read and write permissions to pod and prevent any security concerns.
+
+
+
+2. Got below error in clickhouse statefulset as well in pod logs:
+
+kubectl logs chi-signoz-clickhouse-cluster-0-0-0 --previous
+std::exception. Code: 1001, type: std::__1::__fs::filesystem::filesystem_error, e.what() = filesystem error: in create_directories: Permission denied
+
+Solution:
+Same as zookeeper given root access to create directory and files easily on worker node.
+
+
+3. Struggled to get logs into SigNos Cloud and did following things:
+
+Gone through the documents as below:
+https://signoz.io/docs/tutorial/kubernetes-infra-metrics/
+https://signoz.io/docs/metrics-management/k8s-infra-otel-config/
+
+
+And found that was missing the important configuration in override-values.yaml file:
+
+presets:
+  otlpExporter:
+    enabled: true
+
+Rest everything seems fine.
+
+Please let me know if am missing something or have done any incorrect step.
