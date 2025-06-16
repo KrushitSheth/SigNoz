@@ -10,6 +10,8 @@
     - Other essential parts
 
 ->
+My setup is done on MacOS with minikube, docker, helm, homebrew tooling used
+
 Step 1: 
 
 Firstly created small kubernetes self-hosted cluster using minikube:
@@ -262,4 +264,65 @@ signoz-zookeeper-0                            1/1     Running     0          6m3
     - Logs (messages from your applications)
     - Metrics (numbers about performance)
 
+->
+STEP 1: 
+
+Created override-values.yaml file as below:
+
+global:
+  cloud: others
+  clusterName: multinode-demo                               #----- cluster name (can be anything)
+  deploymentEnvironment: Test_2                             #----- environment name (can be anything)
+otelCollectorEndpoint: ingest.in.signoz.cloud:443           #----- as per your signoz region
+otelInsecure: false   
+signozApiKey: FrVvGVQlGfEYqwEapZJOpBsQ9Viio2cJTXXX          #----- SigNoz API Key so that signoz cloud can identify our environment logs over internet
+presets:
+  otlpExporter:                                             #----- must to export logs
+    enabled: true        
+  logsCollection:                                           #----- choose whehter you want to collect logs
+    enabled: true
+
+  kubernetesAttributes:                                     #----- specific to kubernetes
+    enabled: true
+    passthrough: false
+
+    extractLabels:
+    - tag_name: service.name
+      key: app.kubernetes.io/name
+      from: pod
+
+Step 2:
+
+Deploy the signoz k8s-infra helm chart with override-values.yaml :
+
+helm install my-release signoz/k8s-infra -f override-values.yaml
+
+
+Step 3:
+
+Test the SigNoz self hosted setup working as below:
+
+a. kubectl port-forward -n default svc/signoz 8080:8080
+b. curl -X GET http://localhost:8080/api/v1/health
+
+responses respectively:
+
+a. Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+
+b. {"status":"ok"}% 
+
+Step 4:
+
+Check the logs coming in as expected related via service name:
+
+See attachment_1.
 
